@@ -1,4 +1,3 @@
-import React from 'react';
 import { Publication, PublicationType } from '../types';
 
 const typeLabels: Record<PublicationType, string> = {

@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Stepper } from './components/Stepper';
 import { PublicationTable } from './components/PublicationTable';
 import { parsePublicationsFromText } from './utils/parseText';
