@@ -1,43 +1,65 @@
 import { Publication, VerificationResult } from '../types';
 
-export type UserProfile = {
-  fullName: string;
-  variants: string[];
-};
-
 type Signature = { last: string; initials: string };
 
 const normalize = (value: string) => value.toLowerCase().replace(/[^a-z\s]/g, ' ').replace(/\s+/g, ' ').trim();
 
+// Produce last name + initials, tolerant of middle names and punctuation.
+// Accept both "First Last" and "Last F I" forms by detecting 1-char trailing tokens.
 function toSignature(name: string): Signature {
   const tokens = normalize(name).split(' ').filter(Boolean);
   if (tokens.length === 0) return { last: '', initials: '' };
-  const last = tokens[tokens.length - 1];
+
+  const trailing = tokens[tokens.length - 1];
+  const leading = tokens[0];
+
+  if (trailing.length === 1 && tokens.length >= 2) {
+    const last = leading;
+    const initials = tokens.slice(1).map((t) => t[0]).join('');
+    return { last, initials };
+  }
+
+  const last = trailing;
   const initials = tokens.slice(0, -1).map((t) => t[0]).join('');
   return { last, initials };
 }
 
-function authorIndex(authors: string[], signatures: Signature[]): number {
-  for (let i = 0; i < authors.length; i += 1) {
-    const sig = toSignature(authors[i]);
-    if (sig.last.length === 0) continue;
-    const match = signatures.find(
-      (s) => s.last === sig.last && (s.initials === '' || sig.initials.startsWith(s.initials) || s.initials.startsWith(sig.initials)),
-    );
-    if (match) return i;
+function signaturesMatch(a: Signature, b: Signature): boolean {
+  if (!a.last || !b.last) return false;
+  if (a.last !== b.last) return false;
+  if (!a.initials || !b.initials) return true;
+  return a.initials.startsWith(b.initials) || b.initials.startsWith(a.initials);
+}
+
+function isEtAl(author: string): boolean {
+  return /\bet\s*al\.?/i.test(author);
+}
+
+function authorsAlign(cvAuthors: string[], externalAuthors: string[]): boolean {
+  const externalSigs = externalAuthors.map(toSignature);
+
+  // CV must start from first external author.
+  if (externalSigs.length === 0 && cvAuthors.length > 0) return false;
+
+  for (let i = 0; i < cvAuthors.length; i += 1) {
+    const cvAuthor = cvAuthors[i];
+    if (isEtAl(cvAuthor)) return true; // remaining authors implied
+
+    const cvSig = toSignature(cvAuthor);
+    const extSig = externalSigs[i];
+    if (!extSig) return false;
+    if (!signaturesMatch(cvSig, extSig)) return false;
   }
-  return -1;
+
+  // If CV list ends early without et al, still acceptable; must maintain order from first author.
+  return true;
 }
 
 export function verifyPublication(
   publication: Publication,
   externalAuthors: string[],
-  user: UserProfile,
 ): VerificationResult {
-  const signatures: Signature[] = [user.fullName, ...user.variants].filter(Boolean).map(toSignature);
-
-  const cvIndex = authorIndex(publication.authors, signatures);
-  const externalIndex = authorIndex(externalAuthors, signatures);
+  const authorListsAlign = authorsAlign(publication.authors, externalAuthors);
 
   if (externalAuthors.length === 0) {
     return {
@@ -48,23 +70,19 @@ export function verifyPublication(
     };
   }
 
-  if (externalIndex === -1) {
+  if (authorListsAlign) {
     return {
-      authorship: 'mismatch',
-      position: 'mismatch',
-      status: 'bad',
-      details: 'Name not found in external author list.',
+      authorship: 'match',
+      position: 'match',
+      status: 'good',
+      details: 'CV authors align with external list.',
     };
   }
 
-  const positionMatch = cvIndex === -1 || cvIndex === externalIndex;
-
   return {
-    authorship: 'match',
-    position: positionMatch ? 'match' : 'mismatch',
-    status: positionMatch ? 'good' : 'warning',
-    details: positionMatch
-      ? 'Authorship and position align.'
-      : `Authorship found, but position differs (CV: ${cvIndex + 1 || 'n/a'}, external: ${externalIndex + 1}).`,
+    authorship: 'mismatch',
+    position: 'mismatch',
+    status: 'bad',
+    details: 'CV authors do not match external list.',
   };
 }

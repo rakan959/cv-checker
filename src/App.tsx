@@ -1,31 +1,30 @@
 import { useMemo, useState } from 'react';
 import { Stepper } from './components/Stepper';
 import { PublicationTable } from './components/PublicationTable';
-import { parsePublicationsFromText } from './utils/parseText';
+import { parsePublicationsFromText, extractPublicationsBlock } from './utils/parseText';
 import { extractTextFromPdf } from './utils/pdf';
 import { searchCrossref, pickBestCandidate } from './utils/crossref';
 import { exportCsv, exportHtml } from './utils/exporters';
-import { verifyPublication, UserProfile } from './utils/verify';
+import { verifyPublication } from './utils/verify';
 import { Publication, VerificationResult } from './types';
 
 const steps = [
   { label: 'Input', description: 'Paste text or upload PDF' },
-  { label: 'Identity', description: 'Who are we looking for?' },
   { label: 'Match', description: 'Crossref suggestions' },
   { label: 'Verify', description: 'Authorship + position' },
   { label: 'Report', description: 'Export & share' },
 ];
 
-function useVerification(publications: Publication[], user: UserProfile) {
+function useVerification(publications: Publication[]) {
   return useMemo(() => {
     const verification: Record<string, VerificationResult> = {};
     publications.forEach((pub) => {
       const selected = pub.match?.candidates.find((c) => c.id === pub.match?.selectedId);
       if (!selected) return;
-      verification[pub.id] = verifyPublication(pub, selected.authors, user);
+      verification[pub.id] = verifyPublication(pub, selected.authors);
     });
     return verification;
-  }, [publications, user]);
+  }, [publications]);
 }
 
 export default function App() {
@@ -35,9 +34,7 @@ export default function App() {
   const [isMatching, setIsMatching] = useState(false);
   const [matchProgress, setMatchProgress] = useState('');
   const [publications, setPublications] = useState<Publication[]>([]);
-  const [userProfile, setUserProfile] = useState<UserProfile>({ fullName: '', variants: [] });
-
-  const verification = useVerification(publications, userProfile);
+  const verification = useVerification(publications);
 
   const summary = useMemo(() => {
     let good = 0;
@@ -67,10 +64,12 @@ export default function App() {
     if (!file) return;
     setIsParsing(true);
     try {
-      const text = await extractTextFromPdf(file);
-      const parsed = parsePublicationsFromText(text);
+      const fullText = await extractTextFromPdf(file);
+      // Only keep the publications block before parsing and before showing in the textarea.
+      const scopedText = extractPublicationsBlock(fullText);
+      const parsed = parsePublicationsFromText(scopedText);
       setPublications(parsed);
-      setInputText(text);
+      setInputText(scopedText);
     } catch (error) {
       console.error(error);
       alert('Could not read that PDF. Please ensure it is not password protected.');
@@ -133,8 +132,7 @@ export default function App() {
 
   const canProceed = (step: number) => {
     if (step === 0) return publications.length > 0;
-    if (step === 1) return Boolean(userProfile.fullName.trim());
-    if (step === 2) return publications.every((p) => (p.match?.candidates.length ?? 0) > 0);
+    if (step === 1) return publications.every((p) => (p.match?.candidates.length ?? 0) > 0);
     return true;
   };
 
@@ -322,40 +320,9 @@ export default function App() {
         </section>
 
         <section className="card p-5">
-          <div className="flex items-center justify-between">
-            <div>
-              <h2 className="text-lg font-semibold text-slate-900">Step 2: Who is the CV owner?</h2>
-              <p className="text-sm text-slate-600">Provide the full name and common variants (initials, maiden names).</p>
-            </div>
-          </div>
-          <div className="mt-4 grid gap-4 md:grid-cols-2">
-            <div>
-              <label className="label">Full name</label>
-              <input
-                className="input mt-1"
-                placeholder="e.g., Rakan Al-Qaqaa"
-                value={userProfile.fullName}
-                onChange={(e) => setUserProfile((u) => ({ ...u, fullName: e.target.value }))}
-              />
-            </div>
-            <div>
-              <label className="label">Name variants</label>
-              <textarea
-                className="input mt-1"
-                rows={3}
-                placeholder="Al-Qaqaa R\nRakan A\nR Al-Qaqaa"
-                value={userProfile.variants.join('\n')}
-                onChange={(e) => setUserProfile((u) => ({ ...u, variants: e.target.value.split(/\n/).map((v) => v.trim()).filter(Boolean) }))}
-              />
-              <p className="helper mt-1">Use one variant per line. Include initials the way they appear in publications.</p>
-            </div>
-          </div>
-        </section>
-
-        <section className="card p-5">
           <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
             <div>
-              <h2 className="text-lg font-semibold text-slate-900">Step 3: Match with Crossref</h2>
+              <h2 className="text-lg font-semibold text-slate-900">Step 2: Match with Crossref</h2>
               <p className="text-sm text-slate-600">We search Crossref by title, journal, and year. Adjust entries to improve matches.</p>
             </div>
             <div className="flex gap-2">
@@ -373,7 +340,7 @@ export default function App() {
         <section className="card p-5">
           <div className="flex items-center justify-between">
             <div>
-              <h2 className="text-lg font-semibold text-slate-900">Step 4: Verify authorship & position</h2>
+              <h2 className="text-lg font-semibold text-slate-900">Step 3: Verify authorship & position</h2>
               <p className="text-sm text-slate-600">Green means authorship + position match. Yellow is partial. Red means not found.</p>
             </div>
             <div className="rounded-xl bg-slate-100 px-3 py-2 text-sm font-semibold text-slate-700">
@@ -389,7 +356,7 @@ export default function App() {
         <section className="card p-5">
           <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
             <div>
-              <h2 className="text-lg font-semibold text-slate-900">Step 5: Export report</h2>
+              <h2 className="text-lg font-semibold text-slate-900">Step 4: Export report</h2>
               <p className="text-sm text-slate-600">Download as CSV or a shareable HTML report.</p>
             </div>
             <div className="flex gap-2">
