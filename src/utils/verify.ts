@@ -5,7 +5,7 @@ type Signature = { last: string; initials: string };
 const normalize = (value: string) => value.toLowerCase().replace(/[^a-z\s]/g, ' ').replace(/\s+/g, ' ').trim();
 
 // Produce last name + initials, tolerant of middle names and punctuation.
-// Accept both "First Last" and "Last F I" forms by detecting 1-char trailing tokens.
+// Accept both "First Last" and "Last F I" (or "Last FI") forms by detecting initial-like trailing tokens.
 function toSignature(name: string): Signature {
   const tokens = normalize(name).split(' ').filter(Boolean);
   if (tokens.length === 0) return { last: '', initials: '' };
@@ -13,9 +13,18 @@ function toSignature(name: string): Signature {
   const trailing = tokens[tokens.length - 1];
   const leading = tokens[0];
 
+  const rest = tokens.slice(1);
+  const restAreInitials = rest.length > 0 && rest.every((t) => t.length <= 2);
+
   if (trailing.length === 1 && tokens.length >= 2) {
     const last = leading;
     const initials = tokens.slice(1).map((t) => t[0]).join('');
+    return { last, initials };
+  }
+
+  if (restAreInitials) {
+    const last = leading;
+    const initials = rest.map((t) => t[0]).join('');
     return { last, initials };
   }
 
