@@ -1,5 +1,4 @@
 import { useMemo, useState } from 'react';
-import { Stepper } from './components/Stepper';
 import { PublicationTable } from './components/PublicationTable';
 import { parsePublicationsFromText, extractPublicationsBlock } from './utils/parseText';
 import { extractTextFromPdf } from './utils/pdf';
@@ -7,13 +6,6 @@ import { searchCrossref, pickBestCandidate } from './utils/crossref';
 import { exportCsv, exportHtml } from './utils/exporters';
 import { verifyPublication } from './utils/verify';
 import { Publication, VerificationResult } from './types';
-
-const steps = [
-  { label: 'Input', description: 'Paste text or upload PDF' },
-  { label: 'Match', description: 'Crossref suggestions' },
-  { label: 'Verify', description: 'Authorship + position' },
-  { label: 'Report', description: 'Export & share' },
-];
 
 function useVerification(publications: Publication[]) {
   return useMemo(() => {
@@ -28,7 +20,6 @@ function useVerification(publications: Publication[]) {
 }
 
 export default function App() {
-  const [currentStep, setCurrentStep] = useState(0);
   const [inputText, setInputText] = useState('');
   const [isParsing, setIsParsing] = useState(false);
   const [isMatching, setIsMatching] = useState(false);
@@ -60,19 +51,40 @@ export default function App() {
     }, 50);
   };
 
-  const handlePdfUpload = async (file?: File | null) => {
-    if (!file) return;
+  const handlePdfUploads = async (files?: FileList | null) => {
+    const list = files ? Array.from(files) : [];
+    if (list.length === 0) return;
+
     setIsParsing(true);
+    const allParsed: Publication[] = [];
+    const collectedTexts: string[] = [];
+
+    for (const file of list) {
+      try {
+        const fullText = await extractTextFromPdf(file);
+        const scopedText = extractPublicationsBlock(fullText);
+        const parsed = parsePublicationsFromText(scopedText);
+        allParsed.push(...parsed);
+        collectedTexts.push(scopedText);
+      } catch (error) {
+        console.error(error);
+        alert(`Could not read ${file.name}. Please ensure it is not password protected.`);
+      }
+    }
+
+    if (allParsed.length > 0) {
+      setPublications((prev) => [...prev, ...allParsed]);
+    }
+
+    if (collectedTexts.length > 0) {
+      const combined = collectedTexts.join('\n\n');
+      setInputText((prev) => (prev ? `${prev}\n\n${combined}` : combined));
+    }
+
     try {
-      const fullText = await extractTextFromPdf(file);
-      // Only keep the publications block before parsing and before showing in the textarea.
-      const scopedText = extractPublicationsBlock(fullText);
-      const parsed = parsePublicationsFromText(scopedText);
-      setPublications(parsed);
-      setInputText(scopedText);
-    } catch (error) {
-      console.error(error);
-      alert('Could not read that PDF. Please ensure it is not password protected.');
+      if (allParsed.length > 0) {
+        await handleSearchCrossref(allParsed);
+      }
     } finally {
       setIsParsing(false);
     }
@@ -82,14 +94,17 @@ export default function App() {
     setPublications((prev) => prev.map((p) => (p.id === id ? { ...p, ...patch } : p)));
   };
 
-  const handleSearchCrossref = async () => {
+  const handleSearchCrossref = async (list?: Publication[]) => {
+    const source = list ?? publications;
+    if (source.length === 0) return;
+
     setIsMatching(true);
     setMatchProgress('Starting Crossref lookup...');
 
     const updated: Publication[] = [];
-    for (let i = 0; i < publications.length; i += 1) {
-      const pub = publications[i];
-      setMatchProgress(`Searching ${i + 1}/${publications.length}: ${pub.title.slice(0, 60)}...`);
+    for (let i = 0; i < source.length; i += 1) {
+      const pub = source[i];
+      setMatchProgress(`Searching ${i + 1}/${source.length}: ${pub.title.slice(0, 60)}...`);
       try {
         const candidates = await searchCrossref(pub);
         const auto = pickBestCandidate(candidates);
@@ -107,7 +122,16 @@ export default function App() {
       }
     }
 
-    setPublications(updated);
+    setPublications((prev) => {
+      const merged = [...prev];
+      updated.forEach((u) => {
+        const idx = merged.findIndex((p) => p.id === u.id);
+        if (idx >= 0) merged[idx] = u;
+        else merged.push(u);
+      });
+      return merged;
+    });
+
     setIsMatching(false);
     setMatchProgress('');
   };
@@ -130,11 +154,7 @@ export default function App() {
     );
   };
 
-  const canProceed = (step: number) => {
-    if (step === 0) return publications.length > 0;
-    if (step === 1) return publications.every((p) => (p.match?.candidates.length ?? 0) > 0);
-    return true;
-  };
+  
 
   const renderMatchCard = (pub: Publication) => {
     const candidates = pub.match?.candidates ?? [];
@@ -227,15 +247,12 @@ export default function App() {
     );
   };
 
-  const goToStep = (step: number) => setCurrentStep(step);
-
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-50 via-white to-slate-100">
       <header className="sticky top-0 z-20 border-b border-slate-200 bg-white/80 backdrop-blur">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
           <div>
-            <div className="text-xs uppercase tracking-[0.2em] text-slate-500">CV publication checker</div>
-            <div className="text-xl font-semibold text-slate-900">Trust but verify your ERAS publications</div>
+            <div className="text-2xl font-semibold text-slate-900">CV Publication Checker</div>
           </div>
           <div className="flex items-center gap-3 text-sm text-slate-600">
             <div className="flex items-center gap-1 rounded-full bg-slate-100 px-3 py-1 font-semibold text-slate-700">
@@ -251,21 +268,11 @@ export default function App() {
       </header>
 
       <main className="mx-auto max-w-6xl space-y-6 px-6 py-6 pb-20">
-        <Stepper steps={steps} current={currentStep} />
-
         <section className="card p-5">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
             <div>
-              <h2 className="text-lg font-semibold text-slate-900">Step 1: Add your publications</h2>
-              <p className="text-sm text-slate-600">Paste the publications section or upload your ERAS PDF export.</p>
-            </div>
-            <div className="flex gap-2">
-              <button className="button-secondary" onClick={() => goToStep(Math.max(0, currentStep - 1))} disabled={currentStep === 0}>
-                Back
-              </button>
-              <button className="button-primary" onClick={() => goToStep(Math.min(4, currentStep + 1))} disabled={!canProceed(currentStep)}>
-                Next
-              </button>
+              <h2 className="text-lg font-semibold text-slate-900">Step 1: Add publications</h2>
+              <p className="text-sm text-slate-600">Paste the publications section or upload an ERAS PDF export.</p>
             </div>
           </div>
 
@@ -274,7 +281,7 @@ export default function App() {
               <label className="label">Paste publications</label>
               <textarea
                 className="input mt-1 h-48 w-full resize-vertical"
-                placeholder="Paste your publications section here..."
+                placeholder="Paste publications section here..."
                 value={inputText}
                 onChange={(e) => setInputText(e.target.value)}
               />
@@ -283,13 +290,14 @@ export default function App() {
                   {isParsing ? 'Parsing…' : 'Parse text'}
                 </button>
                 <label className="button-secondary cursor-pointer" htmlFor="pdf-upload">
-                  Upload ERAS PDF
+                  Upload ERAS PDFs
                   <input
                     id="pdf-upload"
                     type="file"
                     accept="application/pdf"
+                    multiple
                     className="hidden"
-                    onChange={(e) => handlePdfUpload(e.target.files?.[0])}
+                    onChange={(e) => handlePdfUploads(e.target.files)}
                   />
                 </label>
               </div>

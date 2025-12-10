@@ -1,11 +1,4 @@
-import { Publication, PublicationType } from '../types';
-
-const typeLabels: Record<PublicationType, string> = {
-  journal: 'Journal/Abstract',
-  poster: 'Poster',
-  oral: 'Oral',
-  other: 'Other',
-};
+import { Publication } from '../types';
 
 type Props = {
   publications: Publication[];
@@ -13,89 +6,131 @@ type Props = {
 };
 
 export function PublicationTable({ publications, onChange }: Props) {
+  const MONTH_PATTERN = /(January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{4}/i;
+
+  const autoResize = (el: HTMLTextAreaElement | null) => {
+    if (!el) return;
+    el.style.height = 'auto';
+    el.style.height = `${el.scrollHeight}px`;
+  };
+
+  const parseJournal = (value: string) => {
+    const base = (value || '').trim();
+    const [leftRaw, ...rest] = base.split(';');
+    const details = rest.join(';').trim();
+
+    const left = leftRaw ? leftRaw.trim() : '';
+    const parts = left.split('.').map((p) => p.trim()).filter(Boolean);
+
+    let journal = parts.join('. ');
+    let monthYear = '';
+
+    if (parts.length >= 2 && MONTH_PATTERN.test(parts[parts.length - 1])) {
+      monthYear = parts[parts.length - 1];
+      journal = parts.slice(0, -1).join('. ');
+    }
+
+    return { journal, monthYear, details };
+  };
+
+  const composeJournal = (journal: string, monthYear: string, details: string) => {
+    const parts = [journal.trim(), monthYear.trim()].filter(Boolean);
+    let combined = parts.join('. ');
+    if (details.trim()) combined = `${combined}${combined ? '; ' : ''}${details.trim()}`;
+    return combined.trim();
+  };
+
   return (
-    <div className="overflow-x-auto">
-      <table className="min-w-full text-sm">
-        <thead>
-          <tr className="text-left text-xs uppercase text-slate-500">
-            <th className="px-3 py-2">Section</th>
-            <th className="px-3 py-2">Type</th>
-            <th className="px-3 py-2">Title</th>
-            <th className="px-3 py-2">Authors</th>
-            <th className="px-3 py-2">Journal / Event</th>
-            <th className="px-3 py-2">Year</th>
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-slate-200">
-          {publications.map((pub) => (
-            <tr key={pub.id} className="align-top">
-              <td className="px-3 py-2">
-                <input
-                  className="input"
-                  value={pub.section}
-                  onChange={(e) => onChange(pub.id, { section: e.target.value })}
-                />
-              </td>
-              <td className="px-3 py-2">
-                <select
-                  className="input"
-                  value={pub.type}
-                  onChange={(e) => onChange(pub.id, { type: e.target.value as PublicationType })}
-                >
-                  {Object.entries(typeLabels).map(([value, label]) => (
-                    <option key={value} value={value}>
-                      {label}
-                    </option>
-                  ))}
-                </select>
-              </td>
-              <td className="px-3 py-2">
-                <textarea
-                  className="input min-w-[260px]"
-                  rows={2}
-                  value={pub.title}
-                  onChange={(e) => onChange(pub.id, { title: e.target.value })}
-                />
-              </td>
-              <td className="px-3 py-2">
-                <textarea
-                  className="input min-w-[220px]"
-                  rows={2}
-                  value={pub.authors.join(', ')}
-                  onChange={(e) =>
-                    onChange(pub.id, {
-                      authors: e.target.value
-                        .split(/,|;|\nand /i)
-                        .map((a) => a.trim())
-                        .filter(Boolean),
-                    })
-                  }
-                />
-              </td>
-              <td className="px-3 py-2">
-                <input
-                  className="input min-w-[200px]"
-                  value={pub.journalOrEvent}
-                  onChange={(e) => onChange(pub.id, { journalOrEvent: e.target.value })}
-                />
-              </td>
-              <td className="px-3 py-2 w-24">
-                <input
-                  className="input"
-                  inputMode="numeric"
-                  pattern="[0-9]*"
-                  value={pub.year ?? ''}
-                  onChange={(e) =>
-                    onChange(pub.id, {
-                      year: e.target.value ? Number(e.target.value) : undefined,
-                    })
-                  }
-                />
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+    <div className="space-y-3">
+      {publications.map((pub, idx) => {
+        const { journal, monthYear, details } = parseJournal(pub.journalOrEvent);
+        return (
+          <div key={pub.id} className="rounded border border-slate-200 bg-white shadow-sm">
+            <div className="border-b border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold uppercase text-slate-600">
+              Publication {idx + 1}
+            </div>
+            <table className="w-full text-sm">
+              <tbody className="divide-y divide-slate-200">
+                <tr className="align-top">
+                  <td className="px-3 py-2" colSpan={2}>
+                    <div className="text-[11px] uppercase text-slate-500">Title</div>
+                    <textarea
+                      className="input w-full resize-none overflow-hidden"
+                      rows={1}
+                      ref={autoResize}
+                      onInput={(e) => autoResize(e.currentTarget)}
+                      value={pub.title}
+                      onChange={(e) => onChange(pub.id, { title: e.target.value })}
+                    />
+                  </td>
+                  <td className="px-3 py-2">
+                    <div className="text-[11px] uppercase text-slate-500">Authors</div>
+                    <textarea
+                      className="input w-full resize-none overflow-hidden"
+                      rows={1}
+                      ref={autoResize}
+                      onInput={(e) => autoResize(e.currentTarget)}
+                      value={pub.authors.join(', ')}
+                      onChange={(e) =>
+                        onChange(pub.id, {
+                          authors: e.target.value
+                            .split(/,|;|\nand /i)
+                            .map((a) => a.trim())
+                            .filter(Boolean),
+                        })
+                      }
+                    />
+                  </td>
+                </tr>
+                <tr className="align-top">
+                  <td className="px-3 py-2">
+                    <div className="text-[11px] uppercase text-slate-500">Journal</div>
+                    <input
+                      className="input w-full"
+                      value={journal}
+                      onChange={(e) =>
+                        onChange(pub.id, {
+                          journalOrEvent: composeJournal(e.target.value, monthYear, details),
+                        })
+                      }
+                    />
+                  </td>
+                  <td className="px-3 py-2">
+                    <div className="text-[11px] uppercase text-slate-500">Pages / Volume</div>
+                    <input
+                      className="input w-full"
+                      value={details}
+                      placeholder="e.g., 144(Suppl 2):A12971"
+                      onChange={(e) =>
+                        onChange(pub.id, {
+                          journalOrEvent: composeJournal(journal, monthYear, e.target.value),
+                        })
+                      }
+                    />
+                  </td>
+                  <td className="px-3 py-2">
+                    <div className="text-[11px] uppercase text-slate-500">Month / Year</div>
+                    <input
+                      className="input w-full"
+                      value={monthYear || (pub.year ? `${pub.year}` : '')}
+                      placeholder="e.g., November 2021"
+                      onChange={(e) => {
+                        const text = e.target.value;
+                        const yearMatch = text.match(/(20\d{2}|19\d{2})/);
+                        const newYear = yearMatch ? Number(yearMatch[1]) : undefined;
+                        onChange(pub.id, {
+                          journalOrEvent: composeJournal(journal, text, details),
+                          year: newYear,
+                        });
+                      }}
+                    />
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        );
+      })}
     </div>
   );
 }
