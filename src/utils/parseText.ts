@@ -1,4 +1,4 @@
-import { nanoid } from './stringId';
+import { nanoid } from './stringId.js';
 import { Publication, PublicationType } from '../types';
 
 const SECTION_HEADERS = [

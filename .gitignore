@@ -9,6 +9,7 @@ yarn-error.log*
 pnpm-debug.log*
 .idea
 *.local
+build.log
 # Local reference PDFs (not checked in)
 reference-pdfs/
 *.pdf

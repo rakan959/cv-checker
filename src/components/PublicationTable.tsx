@@ -45,17 +45,17 @@ export function PublicationTable({ publications, onChange }: Props) {
       {publications.map((pub, idx) => {
         const { journal, monthYear, details } = parseJournal(pub.journalOrEvent);
         return (
-          <div key={pub.id} className="rounded border border-slate-200 bg-white shadow-sm">
-            <div className="border-b border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold uppercase text-slate-600">
+          <div key={pub.id} className="rounded border border-slate-800 bg-slate-900 shadow-sm">
+            <div className="border-b border-slate-800 bg-slate-800 px-3 py-2 text-xs font-semibold uppercase text-slate-300">
               Publication {idx + 1}
             </div>
             <table className="w-full text-sm">
-              <tbody className="divide-y divide-slate-200">
+              <tbody className="divide-y divide-slate-800 text-slate-100">
                 <tr className="align-top">
                   <td className="px-3 py-2" colSpan={2}>
-                    <div className="text-[11px] uppercase text-slate-500">Title</div>
+                    <div className="text-[11px] uppercase text-slate-400">Title</div>
                     <textarea
-                      className="input w-full resize-none overflow-hidden"
+                      className="input w-full resize-none overflow-hidden bg-slate-950"
                       rows={1}
                       ref={autoResize}
                       onInput={(e) => autoResize(e.currentTarget)}
@@ -64,9 +64,9 @@ export function PublicationTable({ publications, onChange }: Props) {
                     />
                   </td>
                   <td className="px-3 py-2">
-                    <div className="text-[11px] uppercase text-slate-500">Authors</div>
+                    <div className="text-[11px] uppercase text-slate-400">Authors</div>
                     <textarea
-                      className="input w-full resize-none overflow-hidden"
+                      className="input w-full resize-none overflow-hidden bg-slate-950"
                       rows={1}
                       ref={autoResize}
                       onInput={(e) => autoResize(e.currentTarget)}
@@ -84,9 +84,9 @@ export function PublicationTable({ publications, onChange }: Props) {
                 </tr>
                 <tr className="align-top">
                   <td className="px-3 py-2">
-                    <div className="text-[11px] uppercase text-slate-500">Journal</div>
+                    <div className="text-[11px] uppercase text-slate-400">Journal</div>
                     <input
-                      className="input w-full"
+                      className="input w-full bg-slate-950"
                       value={journal}
                       onChange={(e) =>
                         onChange(pub.id, {
@@ -96,9 +96,9 @@ export function PublicationTable({ publications, onChange }: Props) {
                     />
                   </td>
                   <td className="px-3 py-2">
-                    <div className="text-[11px] uppercase text-slate-500">Pages / Volume</div>
+                    <div className="text-[11px] uppercase text-slate-400">Pages / Volume</div>
                     <input
-                      className="input w-full"
+                      className="input w-full bg-slate-950"
                       value={details}
                       placeholder="e.g., 144(Suppl 2):A12971"
                       onChange={(e) =>
@@ -109,9 +109,9 @@ export function PublicationTable({ publications, onChange }: Props) {
                     />
                   </td>
                   <td className="px-3 py-2">
-                    <div className="text-[11px] uppercase text-slate-500">Month / Year</div>
+                    <div className="text-[11px] uppercase text-slate-400">Month / Year</div>
                     <input
-                      className="input w-full"
+                      className="input w-full bg-slate-950"
                       value={monthYear || (pub.year ? `${pub.year}` : '')}
                       placeholder="e.g., November 2021"
                       onChange={(e) => {
