@@ -1,13 +1,13 @@
 # CV Publication Checker
 
-A single-page React + TypeScript + Vite tool to verify CV / ERAS-style publication entries against Crossref. Runs entirely client-side and is ready for GitHub Pages.
+A single-page React + TypeScript + Vite tool to verify CV / ERAS-style publication entries against Crossref. Runs entirely client-side and ships to GitHub Pages.
 
 ## Features
-- Paste publications text or upload an ERAS PDF export (pdf.js in-browser extraction).
+- Paste publications text or upload one or many ERAS PDFs (pdf.js in-browser extraction; bulk uploads auto-search Crossref).
 - Heuristic parser for ERAS headings (Publications, Peer Reviewed Journal Articles/Abstracts, Poster Presentation, Oral Presentation, etc.). Handles wrapped lines and hyphenated breaks.
-- Editable table of detected publications (title, authors, journal/event, year, type, section).
-- Crossref lookup per publication with fuzzy scoring (title + journal + year) and candidate selection.
-- Authorship + author-position verification using your name variants.
+- Editable publication cards (title, authors, journal, pages/volume, month/year).
+- Crossref lookup per publication with fuzzy scoring (title + journal + year) and candidate selection (best match auto-selects).
+- Authorship + author-position verification against Crossref authors.
 - Summary banner and export to CSV or HTML report.
 - Responsive, clean UI styled with Tailwind.
 
@@ -24,20 +24,16 @@ npm run build
 npm run preview
 ```
 
-## Deploy to GitHub Pages
-1. Update `base` in `vite.config.ts` to match your repo name (e.g., `/cv-checker/`).
-2. Ensure the repo is committed and pushed.
-3. Deploy:
-```bash
-npm run deploy
-```
-This builds to `dist/` and publishes via `gh-pages` to the `gh-pages` branch. Enable GitHub Pages in repo settings (source: `gh-pages` branch).
+## Deploy to GitHub Pages (GitHub Actions)
+- `vite.config.ts` is set to `base: '/cv-checker/'`. If your repo name differs, update `base` to `/<your-repo>/` before deploying.
+- A workflow at `.github/workflows/deploy.yml` builds and publishes to GitHub Pages on pushes to `main` (or via manual dispatch). It uploads `dist/` and uses GitHub Actions Pages deployment.
+- In repo settings, set Pages source to "GitHub Actions".
 
 ## Project structure
 ```
 src/
-  App.tsx               # Main SPA and step flow
-  components/           # Stepper, editable publication table
+  App.tsx               # Main SPA flow and search/verification UI
+  components/           # Publication table/cards
   utils/                # Parsing, PDF extraction, Crossref, fuzzy matching, verification, exports
   index.css             # Tailwind layer + tokens
   main.tsx              # React root
